@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cost Randomizer</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            width: 90%;
+            max-width: 600px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            color: #444;
+        }
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="number"],
+        input[type="range"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        input[type="range"] {
+            cursor: pointer;
+        }
+        #risk-value {
+            font-size: 1.2em;
+            color: #007bff;
+            font-weight: bold;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #result {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: left;
+            color: #444;
+        }
+        #result p {
+            margin: 10px 0;
+        }
+        .loss {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .profit {
+            color: #5cb85c;
+            font-weight: bold;
+        }
+        #downloadCSV {
+            margin-top: 20px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+    <h1>Cost Randomizer</h1>
+    <label for="name">Transaction Name:</label>
+    <input type="text" id="name" placeholder="Enter transaction name">
+
+    <label for="estimated-cost">Estimated Cost ($):</label>
+    <input type="number" id="estimated-cost" placeholder="Enter estimated cost">
+
+    <label for="risk-reward">
+        <a href="https://docs.google.com/spreadsheets/d/182YKuHMzstp_cHctAwiGgU5WTgPD8PNokrHT4YeCpPo/edit?usp=sharing" target="_blank">
+            Risk/Reward Level (1 - 100):
+        </a>
+    </label>
+    
+    <input type="range" id="risk-reward" min="1" max="100" value="50">
+    <span id="risk-value">50</span>
+
+    <button onclick="simulateOutcome()">Simulate Outcome</button>
+
+    <div id="result"></div>
+    <button id="downloadCSV">Download Data as CSV</button>
+</div>
+    </div>
+
+    <script>
+        const riskSlider = document.getElementById("risk-reward");
+        const riskValueDisplay = document.getElementById("risk-value");
+        riskSlider.addEventListener("input", () => {
+            riskValueDisplay.textContent = riskSlider.value;
+        });
+
+        function simulateOutcome() {
+            const name = document.getElementById("name").value;
+            const estimatedCost = parseFloat(document.getElementById("estimated-cost").value);
+            const riskLevel = parseInt(document.getElementById("risk-reward").value);
+
+            if (isNaN(estimatedCost) || estimatedCost <= 0) {
+                alert("Please enter a valid estimated cost.");
+                return;
+            }
+
+            const minFactor = 1 - (riskLevel / 200);
+            const maxFactor = 1 + (riskLevel / 100);
+            const rewardFactor = Math.random() * (maxFactor - minFactor) + minFactor;
+
+            const actualCost = estimatedCost * rewardFactor;
+
+            let finalAmount = 0;
+            let outcomeType = "";
+
+            if (actualCost < estimatedCost) {
+                const lossAmount = estimatedCost - actualCost;
+                finalAmount = lossAmount;
+                outcomeType = "Loss";
+            } else {
+                const profitAmount = actualCost - estimatedCost;
+                finalAmount = profitAmount;
+                outcomeType = "Profit";
+            }
+
+            const resultDiv = document.getElementById("result");
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = `
+                <p><strong>Transaction Name:</strong> ${name}</p>
+                <p><strong>Estimated Cost:</strong> $${estimatedCost.toFixed(2)}</p>
+                <p><strong>Actual Cost:</strong> $${actualCost.toFixed(2)}</p>
+                ${outcomeType === "Loss"
+                    ? `<p><strong><span class="loss">${outcomeType}:</span></strong> $${finalAmount.toFixed(2)}</p>`
+                    : `<p><strong><span class="profit">${outcomeType}:</span></strong> $${finalAmount.toFixed(2)}</p>`}
+            `;
+
+            saveSimulation(name, estimatedCost, actualCost, riskLevel, outcomeType, finalAmount);
+        }
+
+        function saveSimulation(name, estimatedCost, actualCost, riskLevel, outcome, finalAmount) {
+            const timestamp = new Date().toISOString();
+            const simulation = { name, estimatedCost, actualCost, riskLevel, outcome, finalAmount, timestamp };
+
+            const simulations = JSON.parse(localStorage.getItem("simulations")) || [];
+            simulations.push(simulation);
+            localStorage.setItem("simulations", JSON.stringify(simulations));
+        }
+
+        function downloadCSV() {
+            const data = JSON.parse(localStorage.getItem("simulations")) || [];
+            if (data.length === 0) {
+                alert("No simulation data available to download.");
+                return;
+            }
+
+            const csvRows = ["Transaction Name,Estimated Cost,Actual Cost,Risk Level,Outcome,Final Amount,Timestamp"];
+            data.forEach(row => {
+                csvRows.push(
+                    `${row.name},${row.estimatedCost},${row.actualCost},${row.riskLevel},${row.outcome},${row.finalAmount},${row.timestamp}`
+                );
+            });
+            const csvContent = csvRows.join("\n");
+
+            const blob = new Blob([csvContent], { type: "text/csv" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "simulation_data.csv";
+            link.click();
+        }
+
+        document.getElementById("downloadCSV").addEventListener("click", downloadCSV);
+    </script>
+</body>
+</html>
